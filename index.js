@@ -5,9 +5,32 @@ import mongoose from "mongoose";
 import nodemailer from "nodemailer";
 
 dotenv.config();
+
 const app = express();
-app.use(cors());
+const port = process.env.PORT || 5000;
+
+// ✅ CORS setup
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://my-portfolio-server-nu-eosin.vercel.app", "https://astounding-griffin-1653d5.netlify.app",
+    ],
+    credentials: true,
+      optionsSuccessStatus: 200,
+  })
+);
+
 app.use(express.json());
+
+// ✅ MongoDB Connection
+const uri = `mongodb+srv://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(
+  process.env.DB_PASS)}@cluster0.dvaruep.mongodb.net/portfolio?retryWrites=true&w=majority`;
+
+mongoose
+  .connect(uri)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("❌ MongoDB Error:", err));
 
 // ✅ MongoDB Schema
 const contactSchema = new mongoose.Schema({
@@ -16,21 +39,14 @@ const contactSchema = new mongoose.Schema({
   message: String,
   createdAt: { type: Date, default: Date.now },
 });
-
-const Contact = mongoose.model("Contact", contactSchema);
-
-// ✅ MongoDB Connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err));
+const Contact = mongoose.models.Contact || mongoose.model("Contact", contactSchema);
 
 // ✅ Nodemailer Transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER, // তোমার Gmail
-    pass: process.env.EMAIL_PASS, // App Password (space ছাড়া)
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -43,8 +59,15 @@ transporter.verify((error, success) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.send("ping your portfolio API is running");
+});
+
+app.get('/contact', (req, res) => {
+  res.json({ message: "Contact API is working" });
+});
 // ✅ Contact Form API
-app.post("/api/contact", async (req, res) => {
+app.post("/contact", async (req, res) => {
   const { name, email, message } = req.body;
 
   if (!name || !email || !message) {
@@ -52,11 +75,11 @@ app.post("/api/contact", async (req, res) => {
   }
 
   try {
-    // MongoDB Save
+    // Save to MongoDB
     const newContact = new Contact({ name, email, message });
     await newContact.save();
 
-    // Send email notification
+    // Send email
     await transporter.sendMail({
       from: `"Portfolio Contact" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
@@ -71,6 +94,5 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-// ✅ Server Start
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// ✅ Start Server
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
